@@ -323,7 +323,7 @@ class Linear_Model():
 
     def create_model(self):
         self.model = LinearRegression()
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate,  weight_decay=0.1)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate,  weight_decay=0.1, momentum=0.9)
 
     def train(self, x, y):
         for epoch in range(self.epoches):

@@ -8,8 +8,8 @@ import pandas as pd
 import torch
 
 # %%
-train = pd.read_csv("lhy/hw1/train.csv", index_col=[0, 1]).fillna(0)
-test = pd.read_csv("lhy/hw1/test.csv", header=None).replace('NR', 0).fillna(0)
+train = pd.read_csv("lhy/hw1/train.csv", index_col=[0, 1]).ffill()
+test = pd.read_csv("lhy/hw1/test.csv", header=None).replace('NR', np.nan).ffill()
 
 # %%
 # 作图探索, 目标是画出从某个标的0~23小时的图
@@ -149,7 +149,7 @@ class LinearRegressionV2:
         """
         self.alpha = alpha
         self.wsize = wsize
-        self.w = np.full((self.wsize, ), 1)
+        self.w = np.full((self.wsize, ), 10)
         self.b = -1
         self.factor = factor
 
@@ -234,6 +234,7 @@ class LinearRegressionV3:
         res = (self.w1 * x + (self.w2 * (x*x))).sum() + self.b
         return res
 # %%
+# RMSE
 class LinearRegressionV4:
 
     def __init__(self, alpha: float, wsize: int, factor:float) -> None:
@@ -242,7 +243,7 @@ class LinearRegressionV4:
         """
         self.alpha = alpha
         self.wsize = wsize
-        self.w = np.full((self.wsize, ), 1)
+        self.w = np.full((self.wsize, ), 1000)
         self.b = -1
         self.factor = factor
 
@@ -253,19 +254,21 @@ class LinearRegressionV4:
         """
         mse as cost function
         sqrt(sum((y - y1)^2) / 2m) + factor * sum((self.w) ^ 2)
-        1/(2 * np.sqrt( sum(y-y1)^2 / 2m ))*(1/m * (-x)) + 2*w*factor
+        偏导数w: sqrt((y-y_pred)/2m) * (-x) + factor * w/m
+        偏导数b:
         """
         self.__valid(x, y)
-        y_pred = np.array([self.predict(i) for i in x])
+        y_pred = np.array([self.predict(xi) - y[i] for i, xi in enumerate(x)])
         # 除以2是因为偏导数解出来有2的系数
-        return np.sqrt(((y_pred - y)**2).sum()) / (2 * len(x)) + (np.sum(self.w * self.w) * self.factor) / (2 * len(x))
+        return np.sqrt((((y_pred - y)**2).sum() / (2 * len(x)))) + (np.sum(self.w * self.w) * self.factor) / (2 * len(x))
 
     def train(self, x: List[np.ndarray], y: np.ndarray):
-        grad = np.array([(self.predict(b) - y[i]) * b + self.w * self.factor for i, b in enumerate(x)])
-        w_gradient = np.sum(grad, axis=0) / len(x)
-        w_tmp = self.w - self.alpha * w_gradient
+        rmse = np.array([(np.sqrt(np.power(self.predict(xi) - y[i], 2)) * xi) / (np.sqrt(2) * (self.predict(xi) - y[i])) for i, xi in enumerate(x)])
+        rmse = np.sum(rmse, axis=0) / np.sqrt(len(x))
+        w_tmp = self.w - self.alpha * rmse
         assert np.all((~np.isnan(w_tmp)) & (~np.isinf(w_tmp)))
-        b_gradient = np.sum([self.predict(b) - y for b in x]) / len(y)
+        b_gradient =np.array([(np.sqrt(np.power(self.predict(xi) - y[i], 2))) / (np.sqrt(2) * (self.predict(xi) - y[i])) for i, xi in enumerate(x)])
+        b_gradient = np.sum(rmse, axis=0) / np.sqrt(len(x))
         b_tmp = self.b - self.alpha * b_gradient
         assert np.all((~np.isnan(b_tmp)) & (~np.isinf(b_tmp)))
         self.w = w_tmp
@@ -276,7 +279,7 @@ class LinearRegressionV4:
         return res
 
 # %%
-model = LinearRegressionV2(wsize=x_train_batch[0].shape[0], alpha=0.00001, factor=0.01)
+model = LinearRegressionV2(wsize=x_train_batch[0].shape[0], alpha=0.001, factor=1)
 # batch = 200
 for i in range(20000):
     # num = np.random.randint(low=1, high=len(x_train_batch))
@@ -313,14 +316,14 @@ class Linear_Model():
         """
         Initialize the Linear Model
         """
-        self.learning_rate = 0.001
+        self.learning_rate = 0.1
         self.epoches = 100000
         self.loss_function = torch.nn.MSELoss(reduction="mean")
         self.create_model()
 
     def create_model(self):
         self.model = LinearRegression()
-        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate,  weight_decay=0.01)
+        self.optimizer = torch.optim.SGD(self.model.parameters(), lr=self.learning_rate,  weight_decay=0.1)
 
     def train(self, x, y):
         for epoch in range(self.epoches):
